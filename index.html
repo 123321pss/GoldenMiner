@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>黄金矿工</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #333;
+            font-family: Arial, sans-serif;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #background {
+            position: absolute;
+            width: 100%;
+            height: 75%;
+            bottom: 0;
+            z-index: 1;
+        }
+
+        #top-background {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            height: 25%;
+            z-index: 2;
+        }
+
+        #miner {
+            position: absolute;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-50%);
+            z-index: 3;
+            height: 60px;
+        }
+
+        #score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 100;
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            text-shadow: 2px 2px 4px #000;
+            z-index: 100;
+            font-size: 18px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 25%;
+            left: 0;
+            z-index: 5;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="game-container">
+        <div id="score">分数: 0</div>
+        <img id="top-background" src="./image/heard_long.png" alt="顶部背景">
+        <img id="miner" src="./image/character_down.png" alt="矿工角色">
+        <img id="background" src="./image/background.png" alt="游戏背景">
+        <canvas id="gameCanvas"></canvas>
+        <div id="controls">点击屏幕发射钩子</div>
+    </div>
+    <script>
+        // 定义全局变量
+        let currentQuestion = "";
+        let correctAnswer = 0;
+        let answerGolds = [];
+        let gameActive = true;
+
+        // 游戏初始化
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const minerElement = document.getElementById('miner');
+        const topBackgroundElement = document.getElementById('top-background');
+        const backgroundElement = document.getElementById('background');
+
+        // 设置画布大小
+        function resizeCanvas() {
+            const containerHeight = window.innerHeight;
+            const topHeight = containerHeight * 0.25;
+            const gameHeight = containerHeight * 0.75;
+
+            canvas.width = window.innerWidth;
+            canvas.height = gameHeight;
+
+            topBackgroundElement.style.height = `${topHeight}px`;
+            backgroundElement.style.height = `${gameHeight}px`;
+            minerElement.style.top = `${topHeight - 30}px`;
+        }
+
+        // 生成数学题目
+        function generateMathQuestion() {
+            const num1 = Math.floor(Math.random() * 10) + 1;
+            const num2 = Math.floor(Math.random() * 10) + 1;
+            const operators = ['+', '-', '×', '÷'];
+            const operator = operators[Math.floor(Math.random() * operators.length)];
+
+            switch(operator) {
+                case '+': correctAnswer = num1 + num2; break;
+                case '-': correctAnswer = num1 - num2; break;
+                case '×': correctAnswer = num1 * num2; break;
+                case '÷': correctAnswer = Math.round((num1 / num2) * 10) / 10; break;
+            }
+            currentQuestion = `${num1} ${operator} ${num2} = ?`;
+        }
+
+        // 创建金块
+        function createGolds(count) {
+            const minSize = 30, maxSize = 70;
+            golds = [];
+            answerGolds = [];
+
+            // 创建答案金块
+            for (let i = 0; i < 2; i++) {
+                const size = Math.random() * (maxSize - minSize) + minSize;
+                answerGolds.push({
+                    x: Math.random() * (canvas.width - size * 2) + size,
+                    y: Math.random() * (canvas.height * 0.6) + canvas.height * 0.2,
+                    width: size,
+                    height: size,
+                    value: correctAnswer,
+                    isCorrect: true,
+                    isAnswer: true,
+                    caught: false,
+                    rotation: Math.random() * 360,
+                    color: '#4CAF50'
+                });
+            }
+            
+            for (let i = 0; i < 1; i++) {
+                const size = Math.random() * (maxSize - minSize) + minSize;
+                let answer;
+
+                do {
+                    const offset = Math.floor(Math.random() * 3) + 1;
+                    answer = Math.random() > 0.5 ? correctAnswer + offset : correctAnswer - offset;
+                    if (currentQuestion.includes('÷') && !Number.isInteger(correctAnswer)) {
+                        answer = Math.round(answer);
+                    }
+                } while (answer === correctAnswer);
+
+                answerGolds.push({
+                    x: Math.random() * (canvas.width - size * 2) + size,
+                    y: Math.random() * (canvas.height * 0.6) + canvas.height * 0.2,
+                    width: size,
+                    height: size,
+                    value: answer,
+                    isCorrect: false,
+                    isAnswer: true,
+                    caught: false,
+                    rotation: Math.random() * 360,
+                    color: '#FF5252'
+                });
+            }
+
+            // 创建普通金块
+            for (let i = 0; i < count; i++) {
+                const size = Math.random() * (maxSize - minSize) + minSize;
+                let x, y, overlap;
+                let attempts = 0;
+
+                do {
+                    overlap = false;
+                    x = Math.random() * (canvas.width - size * 2) + size;
+                    y = Math.random() * (canvas.height - size * 2) + size;
+
+                    for (const gold of [...golds, ...answerGolds]) {
+                        const distance = Math.hypot(x - gold.x, y - gold.y);
+                        if (distance < (size + gold.width) / 2) {
+                            overlap = true;
+                            break;
+                        }
+                    }
+                    attempts++;
+                } while (overlap && attempts < 100);
+
+                golds.push({
+                    x: x,
+                    y: y,
+                    width: size,
+                    height: size,
+                    value: Math.floor(size / 10) * 10,
+                    isAnswer: false,
+                    caught: false,
+                    rotation: Math.random() * 360,
+                    color: '#FFD700'
+                });
+            }
+            golds = golds.concat(answerGolds);
+        }
+
+        // 初始化游戏
+        function initGame() {
+            gameActive = true;
+            pivotX = canvas.width / 2;
+            pivotY = 0;
+            generateMathQuestion();
+            createGolds(2);
+            score = 0;
+            hookState = 'swinging';
+            currentHookLength = hookLength;
+            caughtGold = null;
+            updateScore();
+        }
+
+        // 更新分数显示
+        function updateScore() {
+            scoreElement.innerHTML = `分数: ${score}<br>题目: ${currentQuestion}`;
+        }
+
+        // 游戏主循环
+        function gameLoop() {
+            if (!gameActive) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 更新钩子状态
+            const angle = hookAngle * Math.PI / 180;
+            const hookX = pivotX + currentHookLength * Math.sin(angle);
+            const hookY = pivotY + currentHookLength * Math.cos(angle);
+
+            // 绘制钩子线
+            ctx.beginPath();
+            ctx.moveTo(pivotX, pivotY);
+            ctx.lineTo(hookX, hookY);
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // 更新钩子逻辑
+            switch(hookState) {
+                case 'swinging':
+                    hookAngle += hookSpeed * hookDirection;
+                    if (Math.abs(hookAngle) >= maxAngle) hookDirection *= -1;
+                    break;
+                case 'throwing':
+                    currentHookLength += throwSpeed;
+                    const maxLen = calculateMaxLength(hookAngle);
+                    if (currentHookLength >= maxLen) hookState = 'returning';
+                    break;
+                case 'pulling':
+                    handlePulling();
+                    break;
+                case 'returning':
+                    currentHookLength -= pullSpeed * 2;
+                    if (currentHookLength <= hookLength) hookState = 'swinging';
+                    break;
+            }
+
+            drawHook(hookX, hookY);
+            drawGolds(hookX, hookY);
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 计算最大长度
+        function calculateMaxLength(angle) {
+            const rad = angle * Math.PI / 180;
+            const sin = Math.sin(rad), cos = Math.cos(rad);
+            let lengths = [];
+
+            if (sin !== 0) {
+                lengths.push((0 - pivotX)/sin, (canvas.width - pivotX)/sin);
+            }
+            if (cos !== 0) {
+                lengths.push((canvas.height - pivotY)/cos);
+            }
+            return Math.min(...lengths.filter(l => l > 0));
+        }
+
+        // 处理收回状态
+        function handlePulling() {
+            currentHookLength -= pullSpeed;
+            if (caughtGold) {
+                currentHookLength -= pullSpeed / (1 + caughtGold.width/100);
+            }
+
+            if (currentHookLength <= hookLength) {
+                if (caughtGold) {
+                    processCaughtGold();
+                }
+                hookState = 'swinging';
+            }
+        }
+
+        // 处理抓取到的金块
+        function processCaughtGold() {
+            if (caughtGold.value == correctAnswer) {
+                score += 1;
+                generateMathQuestion();
+                createGolds(2);
+            } else {
+                handleWrongAnswer();
+            }
+
+            golds = golds.filter(g => g !== caughtGold);
+            caughtGold = null;
+            updateScore();
+        }
+
+        // 处理错误答案
+        function handleWrongAnswer() {
+            if (score === 0) {
+                gameActive = false;
+                if (confirm('游戏失败！是否重新开始？')) {
+                    initGame();
+                } else {
+                    scoreElement.innerHTML += '<br>点击屏幕重新开始';
+                }
+            } else {
+                score = Math.max(0, score - 1);
+            }
+        }
+
+        // 绘制钩子
+        function drawHook(x, y) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(hookAngle * Math.PI / 180);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, 15);
+            ctx.lineTo(-10, 25);
+            ctx.lineTo(10, 25);
+            ctx.closePath();
+            ctx.fillStyle = '#555';
+            ctx.fill();
+            ctx.strokeStyle = '#000';
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 绘制金块
+        function drawGolds(hookX, hookY) {
+            golds.forEach(gold => {
+                if (gold.caught) {
+                    gold.x = hookX;
+                    gold.y = hookY;
+                    gold.rotation += 5;
+                }
+
+                ctx.save();
+                ctx.translate(gold.x, gold.y);
+                ctx.rotate(gold.rotation * Math.PI / 180);
+                
+                if (goldImg.complete) {
+                    ctx.drawImage(goldImg, -gold.width/2, -gold.height/2, gold.width, gold.height);
+                } else {
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, gold.width/2, gold.height/2, 0, 0, Math.PI*2);
+                    ctx.fillStyle = gold.color || (gold.isAnswer ? (gold.isCorrect ? '#4CAF50' : '#FF5252') : '#FFD700');
+                    ctx.fill();
+                    ctx.strokeStyle = '#FFA500';
+                    ctx.stroke();
+                }
+
+                // 绘制数值/答案
+                ctx.fillStyle = '#000';
+                ctx.font = `${Math.min(14, gold.width/3)}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.fillText(gold.value.toString(), 0, 5);
+                ctx.restore();
+
+                // 碰撞检测
+                if (!gold.caught && hookState === 'throwing') {
+                    const distance = Math.hypot(hookX - gold.x, hookY - gold.y);
+                    if (distance < gold.width/2 + 15) {
+                        gold.caught = true;
+                        caughtGold = gold;
+                        hookState = 'pulling';
+                        pullSpeed = 3 - (gold.width / 50);
+                        
+                        // 触觉反馈
+                        if (window.navigator.vibrate) {
+                            window.navigator.vibrate(50);
+                        }
+                    }
+                }
+            });
+        }
+
+        // 游戏控制 - 触摸和键盘
+        function startThrow() {
+            if (hookState === 'swinging' && gameActive) {
+                hookState = 'throwing';
+            }
+        }
+
+        // 添加触摸事件
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startThrow();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            startThrow();
+        });
+
+        // 添加键盘事件
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && hookState === 'swinging' && gameActive) {
+                hookState = 'throwing';
+            }
+        });
+
+        // 初始化参数
+        let pivotX, pivotY;
+        const hookLength = 50;
+        let hookAngle = 0;
+        let hookSpeed = 1;
+        let hookDirection = 1;
+        let maxAngle = 90;
+        let hookState = 'swinging';
+        let currentHookLength = hookLength;
+        let throwSpeed = 5;
+        let pullSpeed = 3;
+        let caughtGold = null;
+        let score = 0;
+        let golds = [];
+
+        // 预加载金块图片
+        const goldImg = new Image();
+        goldImg.src = './image/gold_modifer.png';
+
+        // 启动游戏
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        initGame();
+        gameLoop();
+    </script>
+</body>
+
+</html>
